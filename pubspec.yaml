@@ -1,5 +1,5 @@
 name: snapd
-description: A macOS command palette app for running custom scripts with contextual awareness.
+description: A floating developer dock for macOS — shell runner, AI agents, chat, and dev tools.
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -21,6 +21,8 @@ dependencies:
   window_manager: ^0.3.8
   # Local hotkey support
   hotkey_manager: ^0.2.2
+  # HTTP client for AI API calls
+  http: ^1.2.1
   # State management
   provider: ^6.1.2
   # Icons

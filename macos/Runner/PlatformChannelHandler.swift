@@ -7,12 +7,14 @@ class PlatformChannelHandler {
     let hotkeyManager: HotkeyManager
     private let shellExecutor: ShellExecutor
     private let contextDetector: ContextDetector
+    private weak var dockManager: DockWindowManager?
 
-    init(channel: FlutterMethodChannel) {
+    init(channel: FlutterMethodChannel, dockManager: DockWindowManager? = nil) {
         self.channel = channel
         self.hotkeyManager = HotkeyManager()
         self.shellExecutor = ShellExecutor()
         self.contextDetector = ContextDetector()
+        self.dockManager = dockManager
     }
 
     func register() {
@@ -27,6 +29,10 @@ class PlatformChannelHandler {
                 self.handleGetActiveAppBundleId(result: result)
             case "toggleWindow":
                 self.handleToggleWindow(result: result)
+            case "getScreenFrame":
+                self.handleGetScreenFrame(result: result)
+            case "initDockWindow":
+                self.handleInitDockWindow(call: call, result: result)
             case "registerGlobalHotkey":
                 self.handleRegisterGlobalHotkey(result: result)
             case "unregisterGlobalHotkey":
@@ -74,19 +80,34 @@ class PlatformChannelHandler {
     }
 
     // -------------------------------------------------------------------------
-    // MARK: – Window management
+    // MARK: – Dock / window management
     // -------------------------------------------------------------------------
 
     private func handleToggleWindow(result: FlutterResult) {
         DispatchQueue.main.async {
-            if let window = NSApplication.shared.mainWindow {
-                if window.isVisible {
-                    window.orderOut(nil)
-                } else {
-                    window.makeKeyAndOrderFront(nil)
-                    NSApplication.shared.activate(ignoringOtherApps: true)
-                }
+            if let window = NSApplication.shared.windows.first(where: { $0.isVisible }) {
+                window.orderOut(nil)
+            } else if let window = NSApplication.shared.windows.first {
+                window.makeKeyAndOrderFront(nil)
+                NSApplication.shared.activate(ignoringOtherApps: true)
             }
+        }
+        result(nil)
+    }
+
+    private func handleGetScreenFrame(result: FlutterResult) {
+        let frame = dockManager?.screenFrame() ?? [:]
+        result(frame)
+    }
+
+    private func handleInitDockWindow(call: FlutterMethodCall, result: FlutterResult) {
+        guard let args = call.arguments as? [String: Any] else {
+            result(nil)
+            return
+        }
+        let height = args["height"] as? Double ?? Double(DockWindowManager.dockBarHeight)
+        DispatchQueue.main.async { [weak self] in
+            self?.dockManager?.positionAtBottom(height: CGFloat(height))
         }
         result(nil)
     }

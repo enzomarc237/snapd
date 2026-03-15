@@ -4,16 +4,14 @@ import FlutterMacOS
 @main
 class AppDelegate: FlutterAppDelegate {
     private var hotKeyManager: HotkeyManager?
+    private var dockManager: DockWindowManager?
 
     override func applicationDidFinishLaunching(_ notification: Notification) {
-        // Configure always-on-top floating window.
+        // Set up the dock window geometry and level.
         if let window = mainFlutterWindow {
-            window.level = .floating
-            window.collectionBehavior = [
-                .canJoinAllSpaces,
-                .fullScreenAuxiliary,
-            ]
-            window.isMovableByWindowBackground = true
+            let mgr = DockWindowManager(window: window)
+            mgr.setupAsDock()
+            dockManager = mgr
         }
 
         // Register platform channel handlers.
@@ -22,7 +20,10 @@ class AppDelegate: FlutterAppDelegate {
                 name: "com.snapd.app/native",
                 binaryMessenger: controller.engine.binaryMessenger
             )
-            let handler = PlatformChannelHandler(channel: channel)
+            let handler = PlatformChannelHandler(
+                channel: channel,
+                dockManager: dockManager
+            )
             hotKeyManager = handler.hotkeyManager
             handler.register()
         }
@@ -33,6 +34,7 @@ class AppDelegate: FlutterAppDelegate {
     override func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         if !hasVisibleWindows {
             mainFlutterWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
         }
         return true
     }

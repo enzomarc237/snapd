@@ -4,7 +4,8 @@ import '../models/command_result.dart';
 
 /// Bridge to native macOS code via platform channels.
 ///
-/// Handles shell execution, active window detection, and window management.
+/// Handles shell execution, active window detection, window management, and
+/// dock window positioning.
 class PlatformService {
   static const _channel = MethodChannel('com.snapd.app/native');
 
@@ -71,7 +72,7 @@ class PlatformService {
   }
 
   // ---------------------------------------------------------------------------
-  // Window management
+  // Window / dock management
   // ---------------------------------------------------------------------------
 
   /// Toggles the visibility of the main window.
@@ -83,7 +84,43 @@ class PlatformService {
     }
   }
 
-  /// Registers the global hotkey for toggling the palette (⌘Space by default).
+  /// Returns the primary screen frame (full and visible area) in logical pixels.
+  ///
+  /// Keys: `width`, `height`, `x`, `y`, `visibleWidth`, `visibleHeight`,
+  ///       `visibleX`, `visibleY`.
+  Future<Map<String, double>> getScreenFrame() async {
+    try {
+      final raw =
+          await _channel.invokeMethod<Map<dynamic, dynamic>>('getScreenFrame');
+      return raw?.map((k, v) => MapEntry(k as String, (v as num).toDouble())) ??
+          {};
+    } on PlatformException {
+      return {};
+    }
+  }
+
+  /// Positions and sizes the window as a dock pinned to the screen bottom.
+  ///
+  /// Called from [DockWindowService.initialize] via the native side so that
+  /// initial placement is exact (avoids window_manager's coordinate mapping
+  /// quirks on first launch).
+  Future<void> initDockWindow({
+    required double width,
+    required double height,
+    required double bottomPadding,
+  }) async {
+    try {
+      await _channel.invokeMethod('initDockWindow', {
+        'width': width,
+        'height': height,
+        'bottomPadding': bottomPadding,
+      });
+    } on PlatformException {
+      // Non-fatal – window_manager fallback is used instead.
+    }
+  }
+
+  /// Registers the global hotkey for toggling the dock (⌘Space by default).
   Future<void> registerGlobalHotkey() async {
     try {
       await _channel.invokeMethod('registerGlobalHotkey');
@@ -101,3 +138,4 @@ class PlatformService {
     }
   }
 }
+
