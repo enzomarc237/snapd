@@ -1,0 +1,8 @@
+// Application-level settings for the Runner target.
+//
+// This may be overridden by a user-defined setting in the Xcode project.
+PRODUCT_BUNDLE_IDENTIFIER = com.snapd.app
+PRODUCT_NAME = snapd
+MACOSX_DEPLOYMENT_TARGET = 10.14
+CURRENT_PROJECT_VERSION = $(FLUTTER_BUILD_NUMBER)
+MARKETING_VERSION = $(FLUTTER_BUILD_NAME)
