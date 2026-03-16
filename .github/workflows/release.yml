@@ -51,6 +51,19 @@ jobs:
       - name: Install Dart/Flutter dependencies
         run: flutter pub get
 
+      # Flutter's Xcode build phases reference xcfilelist files in
+      # macos/build/ephemeral/ via the $(FLUTTER_BUILD_DIR)/ephemeral/ variable.
+      # On a fresh checkout these files don't exist, which causes xcodebuild to
+      # abort before it can run macos_assemble.sh (which would create them).
+      # Creating empty placeholders unblocks Xcode so the first build succeeds.
+      - name: Create Flutter macOS ephemeral xcfilelist placeholders
+        run: |
+          mkdir -p macos/build/ephemeral
+          touch macos/build/ephemeral/App.framework.xcfilelist
+          touch macos/build/ephemeral/FlutterMacOS.framework.xcfilelist
+          touch macos/build/ephemeral/App.framework-output.xcfilelist
+          touch macos/build/ephemeral/FlutterMacOS.framework-output.xcfilelist
+
       # ── 4. Build ─────────────────────────────────────────────────────────────
       - name: Build macOS release app (arm64)
         run: |
