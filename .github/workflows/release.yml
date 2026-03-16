@@ -1,4 +1,4 @@
-name: Build & Release macOS (Intel x64)
+name: Build & Release macOS (Apple Silicon)
 
 # Trigger on every push to the main branch.
 on:
@@ -14,8 +14,8 @@ concurrency:
 
 jobs:
   build-and-release:
-    name: Build macOS Intel x64 & create release draft
-    runs-on: macos-13        # Intel (x86_64) GitHub-hosted runner
+    name: Build macOS Apple Silicon & create release draft
+    runs-on: macos-14        # Apple Silicon (arm64) GitHub-hosted runner
 
     permissions:
       contents: write        # Required to create releases and upload assets
@@ -41,19 +41,18 @@ jobs:
           echo "release_name=Snapd v${BUILD_NAME} (build ${{ github.run_number }})" >> "$GITHUB_OUTPUT"
 
       # ── 3. Flutter ───────────────────────────────────────────────────────────
-      - name: Set up Flutter (stable, x86_64)
+      - name: Set up Flutter (stable, arm64)
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.29.0'
           channel: 'stable'
           cache: true
-          architecture: x64   # Ensure Intel toolchain on macos-13
 
       - name: Install Dart/Flutter dependencies
         run: flutter pub get
 
       # ── 4. Build ─────────────────────────────────────────────────────────────
-      - name: Build macOS release app (Intel x64)
+      - name: Build macOS release app (Apple Silicon)
         run: |
           flutter build macos --release \
             --build-name "${{ steps.version.outputs.build_name }}" \
@@ -63,7 +62,7 @@ jobs:
       - name: Package .app as a zip archive
         run: |
           APP_PATH="build/macos/Build/Products/Release/snapd.app"
-          ZIP_NAME="snapd-${{ steps.version.outputs.build_name }}-macos-x64.zip"
+          ZIP_NAME="snapd-${{ steps.version.outputs.build_name }}-macos-arm64.zip"
           # Preserve symlinks (-y) so the .app bundle remains valid.
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
           echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
@@ -88,7 +87,7 @@ jobs:
             |-------|-------|
             | Version | `${{ steps.version.outputs.build_name }}` |
             | Build number | `${{ steps.version.outputs.build_number }}` |
-            | Platform | macOS Intel (x86_64) |
+            | Platform | macOS Apple Silicon (arm64) |
             | Commit | `${{ github.sha }}` |
             | Triggered by | `${{ github.actor }}` |
 
@@ -101,6 +100,6 @@ jobs:
 
             ### Requirements
 
-            - macOS 10.14 Mojave or later
-            - Intel (x86_64) Mac — Apple Silicon users should use Rosetta 2
+            - macOS 11.0 Big Sur or later
+            - Apple Silicon (arm64) Mac — Intel users should use Rosetta 2
           files: ${{ env.ZIP_NAME }}
