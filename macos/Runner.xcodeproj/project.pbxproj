@@ -79,11 +79,11 @@
 				33FAB671232836740065AC1E /* Runner */,
 				331C80D6294CF71000263BE5 /* RunnerTests */,
 				33CEB47122A05771004F2AC0 /* Flutter */,
-				33CC10ED2044A3C60003C045 /* Products */,
+				33CC10EE2044A3C60003C045 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		33CC10ED2044A3C60003C045 /* Products */ = {
+		33CC10EE2044A3C60003C045 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				33CC10ED2044A3C60003C045 /* snapd.app */,
@@ -138,7 +138,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				331C80DA294CF71000263BE5 /* PBXTargetDependency */,
+				331C80DB294CF71000263BE5 /* PBXTargetDependency */,
 			);
 			name = RunnerTests;
 			productName = RunnerTests;
@@ -193,7 +193,7 @@
 				Base,
 			);
 			mainGroup = 33CC10E42044A3C60003C045;
-			productRefGroup = 33CC10ED2044A3C60003C045 /* Products */;
+			productRefGroup = 33CC10EE2044A3C60003C045 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -270,7 +270,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		331C80DA294CF71000263BE5 /* PBXTargetDependency */ = {
+		331C80DB294CF71000263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 33CC10EC2044A3C60003C045 /* Runner */;
 			targetProxy = 331C80D9294CF71000263BE5 /* PBXContainerItemProxy */;
