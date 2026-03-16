@@ -1,0 +1,43 @@
+name: snapd
+description: A floating developer dock for macOS — shell runner, AI agents, chat, and dev tools.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # JSON serialisation
+  json_annotation: ^4.8.1
+  # File path helpers
+  path_provider: ^2.1.2
+  # UUID generation for command IDs
+  uuid: ^4.3.3
+  # Window management (always-on-top, etc.)
+  window_manager: ^0.3.8
+  # Local hotkey support
+  hotkey_manager: ^0.2.2
+  # HTTP client for AI API calls
+  http: ^1.2.1
+  # State management
+  provider: ^6.1.2
+  # Icons
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.8
+  json_serializable: ^6.7.1
+  mockito: ^5.4.4
+  plugin_platform_interface: ^2.1.8
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

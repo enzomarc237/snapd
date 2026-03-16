@@ -1,0 +1,106 @@
+name: Build & Release macOS (Intel x64)
+
+# Trigger on every push to the main branch.
+on:
+  push:
+    branches:
+      - main
+
+# Ensure only one release job runs at a time; cancel in-progress runs on
+# the same branch when a new push arrives so stale builds don't pile up.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release:
+    name: Build macOS Intel x64 & create release draft
+    runs-on: macos-13        # Intel (x86_64) GitHub-hosted runner
+
+    permissions:
+      contents: write        # Required to create releases and upload assets
+
+    steps:
+      # ── 1. Source ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Read version from pubspec.yaml ────────────────────────────────────
+      # Parses   version: 1.2.3+42   →  build_name=1.2.3  build_number=42
+      - name: Read version from pubspec.yaml
+        id: version
+        run: |
+          RAW=$(grep '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//')
+          BUILD_NAME=$(echo "$RAW" | cut -d'+' -f1)
+          BUILD_NUMBER=$(echo "$RAW" | cut -d'+' -f2)
+          echo "build_name=$BUILD_NAME"       >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER"   >> "$GITHUB_OUTPUT"
+          # Include the GitHub run number so every push produces a unique tag
+          # even when the version in pubspec hasn't been bumped yet.
+          echo "tag=v${BUILD_NAME}+build.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "release_name=Snapd v${BUILD_NAME} (build ${{ github.run_number }})" >> "$GITHUB_OUTPUT"
+
+      # ── 3. Flutter ───────────────────────────────────────────────────────────
+      - name: Set up Flutter (stable, x86_64)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0'
+          channel: 'stable'
+          cache: true
+          architecture: x64   # Ensure Intel toolchain on macos-13
+
+      - name: Install Dart/Flutter dependencies
+        run: flutter pub get
+
+      # ── 4. Build ─────────────────────────────────────────────────────────────
+      - name: Build macOS release app (Intel x64)
+        run: |
+          flutter build macos --release \
+            --build-name "${{ steps.version.outputs.build_name }}" \
+            --build-number "${{ steps.version.outputs.build_number }}"
+
+      # ── 5. Package ───────────────────────────────────────────────────────────
+      - name: Package .app as a zip archive
+        run: |
+          APP_PATH="build/macos/Build/Products/Release/snapd.app"
+          ZIP_NAME="snapd-${{ steps.version.outputs.build_name }}-macos-x64.zip"
+          # Preserve symlinks (-y) so the .app bundle remains valid.
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+
+      # ── 6. Release draft ─────────────────────────────────────────────────────
+      - name: Create GitHub release draft
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.release_name }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## ${{ steps.version.outputs.release_name }}
+
+            > **Status:** Draft — review and publish when ready.
+
+            ### What's in this build
+
+            | Field | Value |
+            |-------|-------|
+            | Version | `${{ steps.version.outputs.build_name }}` |
+            | Build number | `${{ steps.version.outputs.build_number }}` |
+            | Platform | macOS Intel (x86_64) |
+            | Commit | `${{ github.sha }}` |
+            | Triggered by | `${{ github.actor }}` |
+
+            ### Installation
+
+            1. Download **`${{ env.ZIP_NAME }}`** below.
+            2. Unzip it (double-click or `unzip snapd-*.zip`).
+            3. Drag **`snapd.app`** to your `/Applications` folder.
+            4. On first launch right-click → **Open** to bypass Gatekeeper (unsigned build).
+
+            ### Requirements
+
+            - macOS 10.14 Mojave or later
+            - Intel (x86_64) Mac — Apple Silicon users should use Rosetta 2
+          files: ${{ env.ZIP_NAME }}
