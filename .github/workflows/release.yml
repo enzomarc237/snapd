@@ -1,4 +1,4 @@
-name: Build & Release macOS (Apple Silicon)
+name: Build & Release macOS Universal
 
 # Trigger on every push to the main branch.
 on:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build-and-release:
-    name: Build macOS Apple Silicon & create release draft
+    name: Build macOS Universal & create release draft
     runs-on: macos-14        # Apple Silicon (arm64) GitHub-hosted runner
 
     permissions:
@@ -41,7 +41,7 @@ jobs:
           echo "release_name=Snapd v${BUILD_NAME} (build ${{ github.run_number }})" >> "$GITHUB_OUTPUT"
 
       # ── 3. Flutter ───────────────────────────────────────────────────────────
-      - name: Set up Flutter (stable, arm64)
+      - name: Set up Flutter (stable)
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.29.0'
@@ -52,17 +52,88 @@ jobs:
         run: flutter pub get
 
       # ── 4. Build ─────────────────────────────────────────────────────────────
-      - name: Build macOS release app (Apple Silicon)
+      - name: Build macOS release app (arm64)
         run: |
           flutter build macos --release \
             --build-name "${{ steps.version.outputs.build_name }}" \
             --build-number "${{ steps.version.outputs.build_number }}"
 
+      # Build the x86_64 (Intel) slice by calling xcodebuild directly with
+      # -arch x86_64.  Because Flutter adds a "Run Script" build phase that
+      # calls macos_assemble.sh, xcodebuild will re-run the Dart AOT compiler
+      # for x86_64, producing a proper x86_64 App.framework alongside the
+      # x86_64 Swift runner binary.
+      - name: Build x86_64 (Intel) slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushd macos
+          xcodebuild build \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -derivedDataPath ../build/xcode_derived_x86_64 \
+            -arch x86_64 \
+            -sdk macosx \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+          popd
+
+      # Merge the arm64 and x86_64 slices into a universal binary.
+      # Both the Swift runner executable AND the compiled Dart library
+      # (App.framework) must be combined; FlutterMacOS.framework is already
+      # a universal framework supplied by the Flutter SDK.
+      - name: Create universal binary (arm64 + x86_64)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARM64_APP="build/macos/Build/Products/Release/snapd.app"
+          X86_APP="build/xcode_derived_x86_64/Build/Products/Release/snapd.app"
+
+          # Verify both builds produced the expected app bundle
+          for path in "$ARM64_APP/Contents/MacOS/snapd" \
+                      "$X86_APP/Contents/MacOS/snapd"; do
+            if [ ! -f "$path" ]; then
+              echo "Expected binary not found: $path"
+              exit 1
+            fi
+          done
+
+          echo "Before lipo:"
+          lipo -info "$ARM64_APP/Contents/MacOS/snapd"
+          lipo -info "$X86_APP/Contents/MacOS/snapd"
+
+          # 1. Merge the main Swift runner executable
+          lipo -create \
+            -output "$ARM64_APP/Contents/MacOS/snapd" \
+            "$ARM64_APP/Contents/MacOS/snapd" \
+            "$X86_APP/Contents/MacOS/snapd"
+
+          # 2. Merge the Dart AOT library (App.framework)
+          ARM64_APP_FW="$ARM64_APP/Contents/Frameworks/App.framework/App"
+          X86_APP_FW="$X86_APP/Contents/Frameworks/App.framework/App"
+          if [ -f "$ARM64_APP_FW" ] && [ -f "$X86_APP_FW" ]; then
+            lipo -create \
+              -output "$ARM64_APP_FW" \
+              "$ARM64_APP_FW" \
+              "$X86_APP_FW"
+            echo "App.framework after lipo:"
+            lipo -info "$ARM64_APP_FW"
+          else
+            echo "Warning: App.framework binaries not found – skipping App.framework lipo"
+          fi
+
+          echo "Universal runner after lipo:"
+          lipo -info "$ARM64_APP/Contents/MacOS/snapd"
+
       # ── 5. Package ───────────────────────────────────────────────────────────
-      - name: Package .app as a zip archive
+      - name: Package .app as a zip archive (universal)
         run: |
           APP_PATH="build/macos/Build/Products/Release/snapd.app"
-          ZIP_NAME="snapd-${{ steps.version.outputs.build_name }}-macos-arm64.zip"
+          ZIP_NAME="snapd-${{ steps.version.outputs.build_name }}-macos-universal.zip"
           # Preserve symlinks (-y) so the .app bundle remains valid.
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
           echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
@@ -87,7 +158,7 @@ jobs:
             |-------|-------|
             | Version | `${{ steps.version.outputs.build_name }}` |
             | Build number | `${{ steps.version.outputs.build_number }}` |
-            | Platform | macOS Apple Silicon (arm64) |
+            | Platform | macOS Universal (arm64 + x86_64) |
             | Commit | `${{ github.sha }}` |
             | Triggered by | `${{ github.actor }}` |
 
@@ -101,5 +172,5 @@ jobs:
             ### Requirements
 
             - macOS 11.0 Big Sur or later
-            - Apple Silicon (arm64) Mac — Intel users should use Rosetta 2
+            - Apple Silicon **or** Intel Mac (universal binary — no Rosetta needed)
           files: ${{ env.ZIP_NAME }}
