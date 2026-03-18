@@ -43,6 +43,8 @@ app.*.map.json
 # macOS build artifacts
 /macos/Flutter/ephemeral/
 /macos/build/
+/macos/Pods/
+/macos/.symlinks/
 
 # iOS build artifacts
 /ios/Flutter/App.framework
